@@ -284,7 +284,7 @@ fi
 
 out=$(QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" pro --x 2>&1)
 status=$?
-if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro --x' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.0'; then
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro --x' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.1'; then
     ok "dispatch 14: qc pro --x runs the stub with argv and core version"
 else
     bad "dispatch 14: status $status: $out"
@@ -330,7 +330,7 @@ chmod 644 "$W/download"
 out=$(cd "$W" && env -u QUIETCLAUDE_PRO_PATH HOME="$W/home" "$W/links/qc" pro install download --key - 2>&1)
 status=$?
 if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro install download --key -' \
-    && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.0' && [ -x "$W/download" ]; then
+    && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.1' && [ -x "$W/download" ]; then
     ok "dispatch 18: qc pro install <file> without Pro runs the downloaded file"
 else
     bad "dispatch 18: status $status: $out"
