@@ -16,6 +16,11 @@ BLOCKS = {
     "resize-2.1.304.bin": ("resize-2.1.304.bin", ["first", 1936]),
     "resize-2.1.304.keystroke-only.bin": ("resize-2.1.304.bin", ["first"]),
 }
+HEADER = "work \u00b7 test\r\n".encode("utf-8")
+HEADERED = {
+    "banner-2.1.304.header.bin": "banner-2.1.304.bin",
+    "resize-2.1.304.header.bin": "resize-2.1.304.bin",
+}
 
 
 def cut_block(data: bytes, start: int) -> bytes:
@@ -42,6 +47,15 @@ def main() -> int:
             before = len(out)
             out = cut_block(out, start)
             print(f"{name}: removed {before - len(out)} bytes at {start}")
+        with open(os.path.join(EXPECTED, name), "wb") as fh:
+            fh.write(out)
+    for name, source in HEADERED.items():
+        data = open(os.path.join(FIXTURES, BLOCKS[source][0]), "rb").read()
+        first = data.index(START)
+        out = open(os.path.join(EXPECTED, source), "rb").read()
+        assert out[:first] == data[:first]
+        out = out[:first] + HEADER + out[first:]
+        print(f"{name}: header inserted at {first}")
         with open(os.path.join(EXPECTED, name), "wb") as fh:
             fh.write(out)
     return 0

@@ -28,12 +28,6 @@
 
 #define IO_BUFFER 65536
 
-typedef struct {
-    int debug;
-    int stderr_is_tty;
-    int output_errno;
-} bridge_t;
-
 static struct termios g_saved_termios;
 static volatile sig_atomic_t g_termios_saved = 0;
 static int g_signal_pipe[2] = { -1, -1 };
@@ -88,7 +82,7 @@ static int forward_bytes(int fd, const uint8_t *data, size_t len)
     return 0;
 }
 
-static void debug_removed(const bridge_t *b, const uint8_t *data, size_t len)
+static void debug_removed(const qc_bridge_sink *b, const uint8_t *data, size_t len)
 {
     const char *eol = b->stderr_is_tty ? "\r\n" : "\n";
     fprintf(stderr, "[quietclaude] removed banner: %zu bytes%s", len, eol);
@@ -118,18 +112,32 @@ static void debug_removed(const bridge_t *b, const uint8_t *data, size_t len)
     fflush(stderr);
 }
 
-static void on_filter_event(void *ctx, qc_event_kind kind, const uint8_t *data, size_t len)
+static void sink_write(qc_bridge_sink *b, const uint8_t *data, size_t len)
 {
-    bridge_t *b = ctx;
+    if (b->output_errno == 0 && len > 0 && b->write(b->io, data, len) != 0) {
+        b->output_errno = errno != 0 ? errno : EIO;
+    }
+}
+
+void qc_bridge_event(void *sink, qc_event_kind kind, const uint8_t *data, size_t len)
+{
+    qc_bridge_sink *b = sink;
+    const qc_launch_options *o = b->options;
     switch (kind) {
     case QC_EV_OUTPUT:
-        if (b->output_errno == 0 && forward_bytes(STDOUT_FILENO, data, len) != 0) {
-            b->output_errno = errno;
-        }
+        sink_write(b, data, len);
         break;
     case QC_EV_REMOVED:
+        if (o != NULL && o->on_banner_removed != NULL) {
+            o->on_banner_removed(o->ctx, data, len);
+        }
         if (b->debug) {
             debug_removed(b, data, len);
+        }
+        if (o != NULL && o->header != NULL && !b->header_written) {
+            b->header_written = 1;
+            sink_write(b, (const uint8_t *)o->header, strlen(o->header));
+            sink_write(b, (const uint8_t *)"\r\n", 2);
         }
         break;
     case QC_EV_DISARMED:
@@ -211,9 +219,16 @@ static int exit_status(int status)
     return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
 }
 
-int qc_terminal_run(const char *claude_path, char *const argv[], int debug)
+static int write_stdout(void *io, const uint8_t *data, size_t len)
 {
-    bridge_t bridge = { .debug = debug, .stderr_is_tty = isatty(STDERR_FILENO), .output_errno = 0 };
+    (void)io;
+    return forward_bytes(STDOUT_FILENO, data, len);
+}
+
+int qc_terminal_run(const char *claude_path, char *const argv[], const qc_launch_options *options, int debug)
+{
+    qc_bridge_sink bridge = { .write = write_stdout, .io = NULL, .options = options, .debug = debug,
+                              .stderr_is_tty = isatty(STDERR_FILENO), .header_written = 0, .output_errno = 0 };
     struct winsize ws;
     if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) != 0) {
         return fail("get terminal size");
@@ -264,7 +279,7 @@ int qc_terminal_run(const char *claude_path, char *const argv[], int debug)
     }
 
     qc_filter filter;
-    qc_filter_init(&filter, on_filter_event, &bridge, now_ms());
+    qc_filter_init(&filter, qc_bridge_event, &bridge, now_ms());
 
     int stdin_open = 1;
     int master_open = 1;

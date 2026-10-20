@@ -50,6 +50,14 @@ check "settings-dialog timeout without keystroke" "$HERE/fixtures/settings-dialo
     --key-after 1427 --event-time 0 --after-time 5100 "$HERE/fixtures/settings-dialog-2.1.304.bin"
 check "resize redraw not removed after keystroke only" "$HERE/expected/resize-2.1.304.keystroke-only.bin" \
     --key-after 1676 --chunk 1 "$HERE/fixtures/resize-2.1.304.bin"
+check "header inserted where the banner was" "$HERE/expected/banner-2.1.304.header.bin" \
+    --header 'work · test' "$HERE/fixtures/banner-2.1.304.bin"
+check "header inserted where the banner was, 1-byte" "$HERE/expected/banner-2.1.304.header.bin" \
+    --header 'work · test' --chunk 1 "$HERE/fixtures/banner-2.1.304.bin"
+check "header written once across a resize redraw" "$HERE/expected/resize-2.1.304.header.bin" \
+    --header 'work · test' --resize-after 1676 "$HERE/fixtures/resize-2.1.304.bin"
+check "header written once across a resize redraw, 1-byte" "$HERE/expected/resize-2.1.304.header.bin" \
+    --header 'work · test' --resize-after 1676 --chunk 1 "$HERE/fixtures/resize-2.1.304.bin"
 
 W=$(mktemp -d "${TMPDIR:-/tmp}/qc-tests.XXXXXX") || exit 1
 server_pid=
@@ -313,6 +321,21 @@ if [ "$status" -eq 2 ] && [ "$err" = "$nudge_update" ]; then
     ok "dispatch 17: nudge with PATH=/usr/bin"
 else
     bad "dispatch 17: status $status: $err"
+fi
+
+cat > "$W/standalone.c" <<'SOURCE'
+#include "core.h"
+int main(void) { return qc_core_version() == 0; }
+SOURCE
+case $(uname -s) in
+    Linux) libs=-lutil ;;
+    *) libs= ;;
+esac
+if "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -I "$ROOT/src" -o "$W/standalone" "$W/standalone.c" "$ROOT/libquietclaude.a" ${libs:+"$libs"} \
+    && "$W/standalone"; then
+    ok "library: core.h compiles standalone against libquietclaude.a"
+else
+    bad "library: standalone program did not build or run"
 fi
 
 printf '%d passed, %d failed\n' "$pass" "$fail"

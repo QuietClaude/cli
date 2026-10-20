@@ -1,3 +1,5 @@
 qc
 tests/replay
 *.o
+libquietclaude.a
+src/*.o

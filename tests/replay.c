@@ -1,27 +1,18 @@
-#include "../src/banner.h"
+#include "../src/quietclaude.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static void on_event(void *ctx, qc_event_kind kind, const uint8_t *data, size_t len)
+static int write_stdout(void *io, const uint8_t *data, size_t len)
 {
-    FILE *out = ctx;
-    switch (kind) {
-    case QC_EV_OUTPUT:
-        if (len > 0 && fwrite(data, 1, len, out) != len) {
-            perror("replay: write");
-            exit(2);
-        }
-        break;
-    case QC_EV_REMOVED:
-        fprintf(stderr, "removed %zu bytes\n", len);
-        break;
-    case QC_EV_DISARMED:
-        fprintf(stderr, "disarmed (%s)\n", (const char *)data);
-        break;
+    FILE *out = io;
+    if (fwrite(data, 1, len, out) != len) {
+        perror("replay: write");
+        exit(2);
     }
+    return 0;
 }
 
 static long parse_long(const char *text, const char *what)
@@ -44,6 +35,8 @@ int main(int argc, char **argv)
     long event_time = 5000;
     long after_time = -1;
     const char *path = NULL;
+    const char *header = NULL;
+    int debug = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--chunk") == 0 && i + 1 < argc) {
@@ -56,6 +49,10 @@ int main(int argc, char **argv)
             event_time = parse_long(argv[++i], "event-time");
         } else if (strcmp(argv[i], "--after-time") == 0 && i + 1 < argc) {
             after_time = parse_long(argv[++i], "after-time");
+        } else if (strcmp(argv[i], "--header") == 0 && i + 1 < argc) {
+            header = argv[++i];
+        } else if (strcmp(argv[i], "--debug") == 0) {
+            debug = 1;
         } else if (path == NULL && argv[i][0] != '-') {
             path = argv[i];
         } else {
@@ -64,7 +61,7 @@ int main(int argc, char **argv)
         }
     }
     if (path == NULL) {
-        fprintf(stderr, "usage: replay [--chunk N] [--key-after BYTE] [--resize-after BYTE] FIXTURE\n");
+        fprintf(stderr, "usage: replay [--chunk N] [--key-after BYTE] [--resize-after BYTE] [--header TEXT] [--debug] FIXTURE\n");
         return 2;
     }
     if (after_time < 0) {
@@ -107,8 +104,10 @@ int main(int argc, char **argv)
         step = 1;
     }
 
+    qc_launch_options options = { NULL, header, NULL, NULL, debug };
+    qc_bridge_sink sink = { write_stdout, stdout, &options, debug, 0, 0, 0 };
     qc_filter filter;
-    qc_filter_init(&filter, on_event, stdout, 0);
+    qc_filter_init(&filter, qc_bridge_event, &sink, 0);
 
     uint64_t now = 0;
     size_t pos = 0;

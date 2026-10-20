@@ -9,16 +9,25 @@ LDFLAGS += -static
 LDLIBS += -lutil
 endif
 
-SRC = src/launcher.c src/terminal.c src/banner.c
-HDR = src/banner.h src/quietclaude.h
+LIB = libquietclaude.a
+LIB_OBJ = src/core.o src/terminal.o src/banner.o
+HDR = src/banner.h src/core.h src/quietclaude.h
 
 all: qc
 
-qc: $(SRC) $(HDR)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRC) $(LDLIBS)
+lib: $(LIB)
 
-tests/replay: tests/replay.c src/banner.c src/banner.h
-	$(CC) $(CFLAGS) -o $@ tests/replay.c src/banner.c
+$(LIB): $(LIB_OBJ)
+	ar rcs $@ $(LIB_OBJ)
+
+src/%.o: src/%.c $(HDR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+qc: src/launcher.c $(LIB) $(HDR)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ src/launcher.c $(LIB) $(LDLIBS)
+
+tests/replay: tests/replay.c $(LIB) $(HDR)
+	$(CC) $(CFLAGS) -o $@ tests/replay.c $(LIB) $(LDLIBS)
 
 test: qc tests/replay
 	sh tests/run.sh
@@ -27,6 +36,6 @@ install: qc
 	sh install.sh
 
 clean:
-	rm -f qc tests/replay
+	rm -f qc tests/replay $(LIB) $(LIB_OBJ)
 
-.PHONY: all test install clean
+.PHONY: all lib test install clean
