@@ -1,0 +1,61 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            asset: quietclaude-linux-x86_64
+          - os: ubuntu-24.04-arm
+            asset: quietclaude-linux-arm64
+          - os: macos-15-intel
+            asset: quietclaude-darwin-x86_64
+          - os: macos-15
+            asset: quietclaude-darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: make
+      - run: make test
+      - run: |
+          tag="${GITHUB_REF_NAME#v}"
+          first="$(./qc --version | head -n 1)"
+          test "$first" = "QuietClaude $tag"
+      - run: |
+          if [ "$(uname -s)" = Linux ]; then ldd ./qc 2>&1 | grep -q "not a dynamic executable"; else otool -L ./qc; fi
+      - run: cp qc "${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: |
+          cd dist
+          sha256sum quietclaude-* > SHA256SUMS
+          cat SHA256SUMS
+      - run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "QuietClaude $GITHUB_REF_NAME" \
+            --notes "Starts Claude Code without the startup banner. Download the file for your system, check it against SHA256SUMS, and put it in your PATH ahead of Claude Code's own claude. See the README for details."
+        env:
+          GH_TOKEN: ${{ github.token }}
