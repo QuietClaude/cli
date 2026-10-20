@@ -18,8 +18,9 @@ BLOCKS = {
 }
 HEADER = "work \u00b7 test\r\n".encode("utf-8")
 HEADERED = {
-    "banner-2.1.304.header.bin": "banner-2.1.304.bin",
-    "resize-2.1.304.header.bin": "resize-2.1.304.bin",
+    "banner-2.1.304.header.bin": ("banner-2.1.304.bin", HEADER),
+    "resize-2.1.304.header.bin": ("resize-2.1.304.bin", HEADER),
+    "banner-2.1.304.headerfn.bin": ("banner-2.1.304.bin", b"fn:305\r\n"),
 }
 
 
@@ -49,12 +50,12 @@ def main() -> int:
             print(f"{name}: removed {before - len(out)} bytes at {start}")
         with open(os.path.join(EXPECTED, name), "wb") as fh:
             fh.write(out)
-    for name, source in HEADERED.items():
+    for name, (source, header) in HEADERED.items():
         data = open(os.path.join(FIXTURES, BLOCKS[source][0]), "rb").read()
         first = data.index(START)
         out = open(os.path.join(EXPECTED, source), "rb").read()
         assert out[:first] == data[:first]
-        out = out[:first] + HEADER + out[first:]
+        out = out[:first] + header + out[first:]
         print(f"{name}: header inserted at {first}")
         with open(os.path.join(EXPECTED, name), "wb") as fh:
             fh.write(out)

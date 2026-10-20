@@ -58,6 +58,8 @@ check "header written once across a resize redraw" "$HERE/expected/resize-2.1.30
     --header 'work · test' --resize-after 1676 "$HERE/fixtures/resize-2.1.304.bin"
 check "header written once across a resize redraw, 1-byte" "$HERE/expected/resize-2.1.304.header.bin" \
     --header 'work · test' --resize-after 1676 --chunk 1 "$HERE/fixtures/resize-2.1.304.bin"
+check "header_fn result written from the removed bytes" "$HERE/expected/banner-2.1.304.headerfn.bin" \
+    --header-fn --chunk 1 "$HERE/fixtures/banner-2.1.304.bin"
 
 W=$(mktemp -d "${TMPDIR:-/tmp}/qc-tests.XXXXXX") || exit 1
 server_pid=

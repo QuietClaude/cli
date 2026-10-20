@@ -15,6 +15,16 @@ static int write_stdout(void *io, const uint8_t *data, size_t len)
     return 0;
 }
 
+static char fn_header[32];
+
+static const char *header_from_length(void *ctx, const uint8_t *data, size_t len)
+{
+    (void)ctx;
+    (void)data;
+    snprintf(fn_header, sizeof fn_header, "fn:%zu", len);
+    return fn_header;
+}
+
 static long parse_long(const char *text, const char *what)
 {
     char *end = NULL;
@@ -36,6 +46,7 @@ int main(int argc, char **argv)
     long after_time = -1;
     const char *path = NULL;
     const char *header = NULL;
+    int use_header_fn = 0;
     int debug = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -53,6 +64,8 @@ int main(int argc, char **argv)
             header = argv[++i];
         } else if (strcmp(argv[i], "--debug") == 0) {
             debug = 1;
+        } else if (strcmp(argv[i], "--header-fn") == 0) {
+            use_header_fn = 1;
         } else if (path == NULL && argv[i][0] != '-') {
             path = argv[i];
         } else {
@@ -61,7 +74,7 @@ int main(int argc, char **argv)
         }
     }
     if (path == NULL) {
-        fprintf(stderr, "usage: replay [--chunk N] [--key-after BYTE] [--resize-after BYTE] [--header TEXT] [--debug] FIXTURE\n");
+        fprintf(stderr, "usage: replay [--chunk N] [--key-after BYTE] [--resize-after BYTE] [--header TEXT] [--header-fn] [--debug] FIXTURE\n");
         return 2;
     }
     if (after_time < 0) {
@@ -104,7 +117,7 @@ int main(int argc, char **argv)
         step = 1;
     }
 
-    qc_launch_options options = { NULL, header, NULL, NULL, debug };
+    qc_launch_options options = { NULL, header, NULL, NULL, debug, use_header_fn ? header_from_length : NULL };
     qc_bridge_sink sink = { write_stdout, stdout, &options, debug, 0, 0, 0 };
     qc_filter filter;
     qc_filter_init(&filter, qc_bridge_event, &sink, 0);

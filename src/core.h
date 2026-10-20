@@ -10,6 +10,7 @@ typedef struct {
     void (*on_banner_removed)(void *ctx, const uint8_t *data, size_t len);
     void *ctx;
     int debug;
+    const char *(*header_fn)(void *ctx, const uint8_t *data, size_t len);
 } qc_launch_options;
 
 int qc_launch(const qc_launch_options *options, int argc, char **argv);

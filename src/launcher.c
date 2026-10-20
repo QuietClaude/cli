@@ -105,6 +105,6 @@ int main(int argc, char **argv)
         return print_version(argv0, argv[1]);
     }
 
-    qc_launch_options options = { NULL, NULL, NULL, NULL, 0 };
+    qc_launch_options options = { NULL, NULL, NULL, NULL, 0, NULL };
     return qc_launch(&options, argc, argv);
 }

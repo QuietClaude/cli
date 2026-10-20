@@ -134,10 +134,13 @@ void qc_bridge_event(void *sink, qc_event_kind kind, const uint8_t *data, size_t
         if (b->debug) {
             debug_removed(b, data, len);
         }
-        if (o != NULL && o->header != NULL && !b->header_written) {
+        if (o != NULL && (o->header != NULL || o->header_fn != NULL) && !b->header_written) {
             b->header_written = 1;
-            sink_write(b, (const uint8_t *)o->header, strlen(o->header));
-            sink_write(b, (const uint8_t *)"\r\n", 2);
+            const char *text = o->header_fn != NULL ? o->header_fn(o->ctx, data, len) : o->header;
+            if (text != NULL) {
+                sink_write(b, (const uint8_t *)text, strlen(text));
+                sink_write(b, (const uint8_t *)"\r\n", 2);
+            }
         }
         break;
     case QC_EV_DISARMED:

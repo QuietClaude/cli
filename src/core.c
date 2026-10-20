@@ -164,7 +164,7 @@ const char *qc_core_version(void)
 
 int qc_launch(const qc_launch_options *options, int argc, char **argv)
 {
-    static const qc_launch_options defaults = { NULL, NULL, NULL, NULL, 0 };
+    static const qc_launch_options defaults = { NULL, NULL, NULL, NULL, 0, NULL };
     if (options == NULL) {
         options = &defaults;
     }
