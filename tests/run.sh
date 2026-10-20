@@ -284,7 +284,7 @@ fi
 
 out=$(QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" pro --x 2>&1)
 status=$?
-if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro --x' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.0'; then
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro --x' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.1'; then
     ok "dispatch 14: qc pro --x runs the stub with argv and core version"
 else
     bad "dispatch 14: status $status: $out"
@@ -323,6 +323,36 @@ if [ "$status" -eq 2 ] && [ "$err" = "$nudge_update" ]; then
     ok "dispatch 17: nudge with PATH=/usr/bin"
 else
     bad "dispatch 17: status $status: $err"
+fi
+
+cp "$W/pro" "$W/download"
+chmod 644 "$W/download"
+out=$(cd "$W" && env -u QUIETCLAUDE_PRO_PATH HOME="$W/home" "$W/links/qc" pro install download --key - 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro install download --key -' \
+    && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.1' && [ -x "$W/download" ]; then
+    ok "dispatch 18: qc pro install <file> without Pro runs the downloaded file"
+else
+    bad "dispatch 18: status $status: $out"
+fi
+
+err=$(env -u QUIETCLAUDE_PRO_PATH HOME="$W/home" "$W/links/qc" pro install "$W/missing" 2>&1 >/dev/null)
+status=$?
+err2=$(env -u QUIETCLAUDE_PRO_PATH HOME="$W/home" "$W/links/qc" pro install 2>&1 >/dev/null)
+status2=$?
+if [ "$status" -eq 1 ] && [ "$err" = "quietclaude: $W/missing is not a file." ] \
+    && [ "$status2" -eq 2 ] && [ "$err2" = "$(pro_nudge pro)" ]; then
+    ok "dispatch 19: qc pro install with a missing or no file is refused"
+else
+    bad "dispatch 19: status $status: $err / $status2: $err2"
+fi
+
+out=$(QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" pro install "$W/download" 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q "pro stub: pro install $W/download"; then
+    ok "dispatch 20: with Pro installed, qc pro install goes to Pro"
+else
+    bad "dispatch 20: status $status: $out"
 fi
 
 cat > "$W/standalone.c" <<'SOURCE'

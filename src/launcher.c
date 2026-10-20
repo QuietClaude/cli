@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static int print_version(const char *argv0, const char *version_arg)
 {
@@ -64,6 +66,31 @@ static void print_pro_nudge(const char *word)
             word, QUIETCLAUDE_PRO_URL, QUIETCLAUDE_INSTALL_LINE);
 }
 
+static int run_downloaded_pro(char **argv)
+{
+    const char *file = argv[3];
+    struct stat st;
+    if (stat(file, &st) != 0 || !S_ISREG(st.st_mode)) {
+        fprintf(stderr, "quietclaude: %s is not a file.\n", file);
+        return 1;
+    }
+    if (access(file, X_OK) != 0 && chmod(file, st.st_mode | S_IXUSR) != 0) {
+        qc_report_error("chmod");
+        return 1;
+    }
+    if (setenv("QUIETCLAUDE_CORE_VERSION", QUIETCLAUDE_VERSION, 1) != 0) {
+        qc_report_error("setenv");
+        return 1;
+    }
+    return qc_exec_claude(file, argv);
+}
+
+static int is_first_install(char **argv)
+{
+    return strcmp(argv[1], "pro") == 0 && argv[2] != NULL && strcmp(argv[2], "install") == 0
+           && argv[3] != NULL && argv[3][0] != '-';
+}
+
 static int run_pro(char **argv)
 {
     char *pro = NULL;
@@ -77,6 +104,9 @@ static int run_pro(char **argv)
         }
     }
     if (pro == NULL || !qc_is_executable_file(pro)) {
+        if (is_first_install(argv)) {
+            return run_downloaded_pro(argv);
+        }
         print_pro_nudge(argv[1]);
         return 2;
     }
