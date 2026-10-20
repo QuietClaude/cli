@@ -251,10 +251,10 @@ SCRIPT
 chmod 755 "$W/pro"
 nudge_update="quietclaude: the free launcher does not update itself.
 Updating is part of QuietClaude Pro. See https://github.com/QuietClaude/cli#pro
-To update the free launcher, run the install command again: curl -fsSL https://raw.githubusercontent.com/QuietClaude/cli/main/install.sh | sh"
+To update the free launcher, run the install command again: curl -fsSL https://quietclaude.com/install.sh | sh"
 
 pro_nudge() {
-    printf "quietclaude: '%s' is part of QuietClaude Pro. See https://github.com/QuietClaude/cli#pro\nTo update the free launcher, run the install command again: curl -fsSL https://raw.githubusercontent.com/QuietClaude/cli/main/install.sh | sh\n" "$1"
+    printf "quietclaude: '%s' is part of QuietClaude Pro. See https://github.com/QuietClaude/cli#pro\nTo update the free launcher, run the install command again: curl -fsSL https://quietclaude.com/install.sh | sh\n" "$1"
 }
 
 err=$("$W/links/qc" update 2>&1 >/dev/null)

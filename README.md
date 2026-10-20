@@ -16,7 +16,7 @@ Claude Code has no option to turn the banner off (see issues
 One line, Linux or macOS:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/QuietClaude/cli/main/install.sh | sh
+curl -fsSL https://quietclaude.com/install.sh | sh
 ```
 
 The script downloads the release for your machine, checks it against `SHA256SUMS`, and puts it in
@@ -24,7 +24,7 @@ The script downloads the release for your machine, checks it against `SHA256SUMS
 copy. To avoid `sudo`, pick a folder you own:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/QuietClaude/cli/main/install.sh | PREFIX="$HOME/bin" sh
+curl -fsSL https://quietclaude.com/install.sh | PREFIX="$HOME/bin" sh
 ```
 
 Prefer to do it by hand? Download the file for your machine from the
