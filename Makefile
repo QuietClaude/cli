@@ -20,7 +20,7 @@ qc: $(SRC) $(HDR)
 tests/replay: tests/replay.c src/banner.c src/banner.h
 	$(CC) $(CFLAGS) -o $@ tests/replay.c src/banner.c
 
-test: tests/replay
+test: qc tests/replay
 	sh tests/run.sh
 
 install: qc

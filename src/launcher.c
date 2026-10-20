@@ -173,10 +173,80 @@ static int print_version(const char *self, const char *argv0, const char *versio
     return 1;
 }
 
+static const char *base_name(const char *path)
+{
+    const char *slash = strrchr(path, '/');
+    return slash != NULL ? slash + 1 : path;
+}
+
+static int is_pro_word(const char *word)
+{
+    static const char *const words[] = { "pro", "profile", "header", "sync", "--profile" };
+    if (word[0] == '@') {
+        return 1;
+    }
+    for (size_t i = 0; i < sizeof words / sizeof words[0]; i++) {
+        if (strcmp(word, words[i]) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void print_update_nudge(void)
+{
+    fprintf(stderr, "quietclaude: the free launcher does not update itself.\n"
+                    "Updating is part of QuietClaude Pro. See %s\n"
+                    "To update the free launcher, run the install command again: %s\n",
+            QUIETCLAUDE_PRO_URL, QUIETCLAUDE_INSTALL_LINE);
+}
+
+static void print_pro_nudge(const char *word)
+{
+    fprintf(stderr, "quietclaude: '%s' is part of QuietClaude Pro. See %s\n"
+                    "To update the free launcher, run the install command again: %s\n",
+            word, QUIETCLAUDE_PRO_URL, QUIETCLAUDE_INSTALL_LINE);
+}
+
+static int run_pro(char **argv)
+{
+    char *pro = NULL;
+    const char *forced = getenv("QUIETCLAUDE_PRO_PATH");
+    if (forced != NULL && forced[0] != '\0') {
+        pro = xstrdup(forced);
+    } else {
+        const char *home = getenv("HOME");
+        if (home != NULL && home[0] != '\0') {
+            pro = join_path(home, ".quietclaude/pro");
+        }
+    }
+    if (pro == NULL || !is_executable_file(pro)) {
+        print_pro_nudge(argv[1]);
+        return 2;
+    }
+    if (setenv("QUIETCLAUDE_CORE_VERSION", QUIETCLAUDE_VERSION, 1) != 0) {
+        qc_report_error("setenv");
+        return 1;
+    }
+    exec_claude(pro, argv);
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
-    char *self = launcher_path(argc > 0 ? argv[0] : NULL);
     const char *argv0 = argc > 0 ? argv[0] : "claude";
+
+    if (argc >= 2) {
+        if (strcmp(base_name(argv0), "qc") == 0 && strcmp(argv[1], "update") == 0) {
+            print_update_nudge();
+            return 2;
+        }
+        if (is_pro_word(argv[1])) {
+            return run_pro(argv);
+        }
+    }
+
+    char *self = launcher_path(argc > 0 ? argv[0] : NULL);
 
     if (argc == 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0)) {
         return print_version(self, argv0, argv[1]);
