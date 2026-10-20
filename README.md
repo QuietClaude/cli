@@ -13,7 +13,21 @@ Claude Code has no option to turn the banner off (see issues
 
 ## Install
 
-Download the file for your machine from the
+One line, Linux or macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/QuietClaude/cli/main/install.sh | sh
+```
+
+The script downloads the release for your machine, checks it against `SHA256SUMS`, and puts it in
+`/usr/local/sbin` as `claude` with a `qc` link next to it. It asks for `sudo` only for that last
+copy. To avoid `sudo`, pick a folder you own:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/QuietClaude/cli/main/install.sh | PREFIX="$HOME/bin" sh
+```
+
+Prefer to do it by hand? Download the file for your machine from the
 [latest release](https://github.com/QuietClaude/cli/releases/latest) and check it against
 `SHA256SUMS`. Then put it somewhere in your `PATH` ahead of Claude Code's own `claude`:
 
@@ -51,6 +65,11 @@ can change the location with `PREFIX`, `DEST`, `ALIAS` (set it empty to skip the
 ```sh
 PREFIX="$HOME/bin" make install
 ```
+
+## Updating
+
+The free launcher does not update itself. Run the install line again and you have the newest
+version. `qc update` tells you the same thing.
 
 ## Use
 
@@ -93,6 +112,7 @@ If nothing is found it tells you and exits with status 127.
 |---|---|
 | `QUIETCLAUDE_CLAUDE_PATH` | Use this Claude Code binary and skip the search. |
 | `QUIETCLAUDE_DEBUG=1` | Print what was removed, and when the watch stopped, on stderr. |
+| `QUIETCLAUDE_PRO_PATH` | Where the Pro binary lives, if not `~/.quietclaude/pro`. |
 
 Exit status is Claude Code's own. If Claude Code is killed by a signal you get 128 plus the signal
 number. 127 means Claude Code was not found. 1 means QuietClaude itself failed, with one line on
@@ -123,6 +143,13 @@ make test
 The tests replay real Claude Code output recorded in `tests/fixtures/` through the filter, whole
 and one byte at a time, and compare the result with `tests/expected/`. `tests/pty_check.py` runs
 the built binary in a pseudoterminal and checks that the banner is gone and the rest is intact.
+
+## Pro
+
+The free launcher stays free and open source. QuietClaude Pro is a separate paid binary that adds
+profiles for several Claude Code accounts, a header line you choose instead of the banner, config
+sync between your machines, and `qc pro update`. Once it is installed, `qc` hands the Pro commands
+over to it. Pro is not on sale yet; this section gets the link when it is.
 
 ## Licence
 
