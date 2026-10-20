@@ -88,24 +88,38 @@ SCRIPT
         chmod 755 "$dir/$name"
     done
 done
-(cd "$W/srv/good/releases/latest/download" && sha256sum quietclaude-* > SHA256SUMS)
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+(cd "$W/srv/good/releases/latest/download" && for name in quietclaude-*; do printf '%s  %s\n' "$(sha256_of "$name")" "$name"; done > SHA256SUMS)
 cp "$W/srv/good/releases/latest/download/SHA256SUMS" "$W/srv/good/releases/download/v9.9.9/SHA256SUMS"
 cp "$W/srv/good/releases/latest/download/SHA256SUMS" "$W/srv/bad/releases/latest/download/SHA256SUMS"
 echo "echo tampered" >> "$W/srv/bad/releases/latest/download/quietclaude-linux-x86_64"
 grep -v quietclaude-linux-x86_64 "$W/srv/good/releases/latest/download/SHA256SUMS" > "$W/srv/nosum/releases/latest/download/SHA256SUMS"
 
-python3 -I -u -m http.server --bind 127.0.0.1 --directory "$W/srv" 0 > "$W/server.log" 2>&1 &
+python3 -I "$HERE/release_server.py" "$W/srv" > "$W/server.port" 2> "$W/server.log" &
 server_pid=$!
+port=
 tries=0
-while ! grep -q 'port' "$W/server.log" 2>/dev/null; do
-    tries=$((tries + 1))
-    if [ "$tries" -gt 50 ]; then
-        bad "release server did not start"
-        break
+while [ -z "$port" ]; do
+    first=$(head -n 1 "$W/server.port" 2>/dev/null)
+    case $first in
+        *[!0-9]*|"") ;;
+        *) port=$first ;;
+    esac
+    if [ -z "$port" ]; then
+        tries=$((tries + 1))
+        if [ "$tries" -gt 100 ]; then
+            bad "release server did not start"
+            break
+        fi
+        sleep 0.1
     fi
-    sleep 0.1
 done
-port=$(sed -n 's/.*port \([0-9]*\).*/\1/p' "$W/server.log" | head -n 1)
 BASE=http://127.0.0.1:$port
 SCRATCH=$W/scratch
 mkdir -p "$SCRATCH"
@@ -145,7 +159,7 @@ done
 
 out=$(installer PREFIX="$W/p3" QUIETCLAUDE_RELEASE_BASE="$BASE/good" FAKE_OS=SunOS FAKE_ARCH=sparc 2>&1)
 status=$?
-if [ "$status" -eq 1 ] && [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ] && printf '%s' "$out" | grep -q 'SunOS/sparc' && [ ! -e "$W/p3/claude" ]; then
+if [ "$status" -eq 1 ] && [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -eq 1 ] && printf '%s' "$out" | grep -q 'SunOS/sparc' && [ ! -e "$W/p3/claude" ]; then
     ok "installer 3: unsupported pair"
 else
     bad "installer 3: status $status: $out"
