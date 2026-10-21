@@ -67,6 +67,9 @@ cleanup() {
     if [ -n "$server_pid" ]; then
         kill "$server_pid" 2>/dev/null
     fi
+    if [ -n "${dl_pid-}" ]; then
+        kill "$dl_pid" 2>/dev/null
+    fi
     rm -rf "$W"
 }
 trap cleanup EXIT INT TERM HUP
@@ -369,7 +372,7 @@ status=$?
 err2=$(env -u QUIETCLAUDE_PRO_PATH HOME="$W/home" "$W/links/qc" pro install 2>&1 >/dev/null)
 status2=$?
 if [ "$status" -eq 1 ] && [ "$err" = "quietclaude: $W/missing is not a file." ] \
-    && [ "$status2" -eq 2 ] && [ "$err2" = "$(pro_nudge pro)" ]; then
+    && [ "$status2" -eq 2 ] && printf '%s' "$err2" | grep -q 'a licence key is needed'; then
     ok "dispatch 19: qc pro install with a missing or no file is refused"
 else
     bad "dispatch 19: status $status: $err / $status2: $err2"
@@ -814,6 +817,250 @@ if unshare -rm true 2>/dev/null; then
     fi
     rm -rf "$W/bobhome" "$W/bobbyhome" "$W/passwd"
 fi
+
+# qc pro install with no file: detect the system, ask for the key, download, install.
+DL=$W/dl
+mkdir -p "$DL/root" "$DL/tmp"
+case "$(uname -s)/$(uname -m)" in
+    Linux/x86_64) DLASSET=quietclaude-pro-linux-x86_64 ;;
+    Linux/aarch64) DLASSET=quietclaude-pro-linux-arm64 ;;
+    Darwin/x86_64) DLASSET=quietclaude-pro-darwin-x86_64 ;;
+    *) DLASSET=quietclaude-pro-darwin-arm64 ;;
+esac
+cat > "$DL/root/$DLASSET" <<'SCRIPT'
+#!/bin/sh
+echo "pro stub args: $*"
+IFS= read -r k
+echo "pro stub key: $k"
+exit "${STUB_EXIT:-0}"
+SCRIPT
+printf 'sums\n' > "$DL/root/SHA256SUMS"
+printf 'sig\n' > "$DL/root/SHA256SUMS.sig"
+python3 -I "$HERE/fake_dl.py" "$DL/root" "$DL/log" > "$DL/port" 2> "$DL/err" &
+dl_pid=$!
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ -s "$DL/port" ] && break
+    sleep 0.2
+done
+DLPORT=$(head -n 1 "$DL/port")
+rm -rf "$W/home/.quietclaude"
+dlenv() { env HOME="$W/home" TMPDIR="$DL/tmp" QUIETCLAUDE_PRO_BASE="http://127.0.0.1:$DLPORT" "$@"; }
+dl_left() { { find "$DL/tmp" -mindepth 1; find "$W/home/.quietclaude" -mindepth 0 2>/dev/null; } | wc -l | tr -d ' '; }
+: > "$DL/log"
+
+out=$(printf 'VALID-KEY-1234\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q "^Downloading QuietClaude Pro for this machine ($DLASSET)" \
+    && printf '%s' "$out" | grep -qE "^pro stub args: pro install $W/home/\.quietclaude/\.qcpro\.[A-Za-z0-9]+/$DLASSET --key -$" \
+    && printf '%s' "$out" | grep -q '^pro stub key: VALID-KEY-1234$' && [ "$(dl_left)" = "0" ]; then
+    ok "pro download 1: the key from stdin, three files fetched, the installer run on them with the key, temporary folder removed"
+else
+    bad "pro download 1: status $status: $out (left: $(dl_left))"
+fi
+reqs=$(sed 's/ key=yes//' "$DL/log" | tr '\n' ' ')
+if [ "$reqs" = "/pro/download/SHA256SUMS /pro/download/SHA256SUMS.sig /pro/download/$DLASSET " ]; then
+    ok "pro download 2: the free checksum files are asked for first, the program last, each with the key"
+else
+    bad "pro download 2: $reqs"
+fi
+
+: > "$DL/log"
+out=$(printf 'BAD-KEY-12345\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'this licence key is not valid; nothing installed' && ! printf '%s' "$out" | grep -q 'pro stub' \
+    && [ "$(wc -l < "$DL/log" | tr -d ' ')" = "1" ] && [ "$(dl_left)" = "0" ]; then
+    ok "pro download 3: an invalid key stops at the first free file, before the program is downloaded, and nothing is left behind"
+else
+    bad "pro download 3: status $status: $out (requests: $(wc -l < "$DL/log"))"
+fi
+
+out=$(printf 'LIMIT-KEY-1234\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'too many downloads today' && [ "$(dl_left)" = "0" ]; then
+    ok "pro download 4: the daily limit is reported and cleaned up"
+else
+    bad "pro download 4: status $status: $out"
+fi
+out=$(printf 'DOWN-KEY-12345\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'licence service is not available right now'; then
+    ok "pro download 5: an outage is reported and nothing is installed"
+else
+    bad "pro download 5: status $status: $out"
+fi
+out=$(printf 'NOREL-KEY-1234\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'no Pro release for this machine yet'; then
+    ok "pro download 6: no release yet is reported"
+else
+    bad "pro download 6: status $status: $out"
+fi
+
+out=$(PTY_PROMPT="Licence key:" python3 "$HERE/pty_uninstall.py" VALID-TYPED-KEY1 env HOME="$W/home" TMPDIR="$DL/tmp" QUIETCLAUDE_PRO_BASE="http://127.0.0.1:$DLPORT" "$W/links/qc" pro install 2>&1)
+if printf '%s' "$out" | grep -q 'exit=0' && printf '%s' "$out" | grep -q 'pro stub key: VALID-TYPED-KEY1' && ! printf '%s' "$out" | grep -v 'pro stub key' | grep -q 'VALID-TYPED-KEY1'; then
+    ok "pro download 7: with nothing else given it asks for the key at the terminal, and the key is not shown as you type"
+else
+    bad "pro download 7: $out"
+fi
+
+mkdir -p "$W/home/.quietclaude"
+printf 'VALID-SAVED-KEY\n' > "$W/home/.quietclaude/license"
+out=$(dlenv "$W/links/qc" pro install 2>&1 < /dev/null)
+status=$?
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'Using the licence key saved in ~/.quietclaude/license' && printf '%s' "$out" | grep -q 'pro stub key: VALID-SAVED-KEY'; then
+    ok "pro download 8: a key kept by an earlier install is reused without asking"
+else
+    bad "pro download 8: status $status: $out"
+fi
+rm -rf "$W/home/.quietclaude"
+
+: > "$DL/log"
+out=$(python3 "$HERE/pty_uninstall.py" none env HOME="$W/home" TMPDIR="$DL/tmp" QUIETCLAUDE_PRO_BASE="http://127.0.0.1:$DLPORT" "$W/links/qc" pro install 2>&1)
+if printf '%s' "$out" | grep -q 'exit=2' && printf '%s' "$out" | grep -q 'a licence key is needed' && [ ! -s "$DL/log" ]; then
+    ok "pro download 9: no key and no terminal is a clear error and nothing is requested"
+else
+    bad "pro download 9: $out"
+fi
+
+out=$(printf 'bad"key with spaces\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+out2=$(printf 'short\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
+if [ "$status" -eq 2 ] && printf '%s' "$out" | grep -q 'does not look like a licence key' && printf '%s' "$out2" | grep -q 'does not look like a licence key' && [ ! -s "$DL/log" ]; then
+    ok "pro download 10: a key with odd characters or the wrong length never reaches curl or the server"
+else
+    bad "pro download 10: $status $out / $out2"
+fi
+
+mkdir -p "$W/shim"
+REALCURL=$(command -v curl)
+cat > "$W/shim/curl" <<SCRIPT
+#!/bin/sh
+printf '%s\n' "\$@" >> "$W/curl.args"
+exec "$REALCURL" "\$@"
+SCRIPT
+chmod 755 "$W/shim/curl"
+: > "$W/curl.args"
+out=$(printf 'VALID-SECRET-9876\n' | PATH="$W/shim:$PATH" dlenv "$W/links/qc" pro install --key - 2>&1)
+if printf '%s' "$out" | grep -q 'pro stub key: VALID-SECRET-9876' && [ -s "$W/curl.args" ] && ! grep -q 'VALID-SECRET-9876' "$W/curl.args" && grep -qx -- '-K' "$W/curl.args"; then
+    ok "pro download 11: the key is never in curl's arguments (it goes through curl's config on standard input)"
+else
+    bad "pro download 11: $(cat "$W/curl.args" | tr '\n' ' ')"
+fi
+
+out=$(printf 'VALID-KEY-1234\n' | env HOME="$W/home" TMPDIR="$DL/tmp" QUIETCLAUDE_PRO_BASE="http://example.com" "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'must start with https://'; then
+    ok "pro download 12: plain http is refused except for a local test server"
+else
+    bad "pro download 12: status $status: $out"
+fi
+
+out=$(printf 'VALID-KEY-1234\n' | dlenv env PATH="$W/nocurl" "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'curl is needed' && [ "$(dl_left)" = "0" ]; then
+    ok "pro download 13: without curl it says so and cleans up"
+else
+    bad "pro download 13: status $status: $out"
+fi
+
+out=$(printf 'VALID-KEY-1234\n' | STUB_EXIT=3 dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 3 ] && [ "$(dl_left)" = "0" ]; then
+    ok "pro download 14: the installer's exit status is passed on and the temporary folder is removed"
+else
+    bad "pro download 14: status $status (left: $(dl_left))"
+fi
+
+out=$(dlenv "$W/links/qc" pro install VALID-KEY-1234 2>&1 < /dev/null)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'is not a file'; then
+    ok "pro download 15: a file argument still takes the old route (install from a file you have)"
+else
+    bad "pro download 15: status $status: $out"
+fi
+
+: > "$DL/log"
+for badbase in "http://127.0.0.1.evil.example" "http://localhost.evil.com" "http://127.0.0.1@evil.example"; do
+    out=$(printf 'VALID-KEY-1234\n' | env HOME="$W/home" QUIETCLAUDE_PRO_BASE="$badbase" "$W/links/qc" pro install --key - 2>&1)
+    status=$?
+    if [ "$status" -ne 1 ] || ! printf '%s' "$out" | grep -q 'must start with https://'; then
+        badhttp="$badbase: $status $out"
+    fi
+done
+if [ -z "${badhttp-}" ] && [ ! -s "$DL/log" ]; then
+    ok "pro download 16: addresses that only begin like 127.0.0.1 or localhost are refused, so the key is never sent in clear text to another host"
+else
+    bad "pro download 16: ${badhttp-}"
+fi
+
+mkdir -p "$W/curlhome"
+printf 'fail\ninsecure\nverbose\n' > "$W/curlhome/.curlrc"
+cp "$W/curlhome/.curlrc" "$W/home/.curlrc"
+out=$(printf 'BAD-KEY-12345\n' | CURL_HOME="$W/curlhome" dlenv "$W/links/qc" pro install --key - 2>&1)
+status=$?
+rm -f "$W/home/.curlrc"
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'this licence key is not valid' && ! printf '%s' "$out" | grep -qi 'authorization'; then
+    ok "pro download 17: the user's .curlrc is ignored (no fail, insecure or verbose changing the result or printing the key)"
+else
+    bad "pro download 17: status $status: $out"
+fi
+
+mkdir -p "$W/home/.quietclaude"
+printf 'BAD-SAVED-KEY1\n' > "$W/home/.quietclaude/license"
+out=$(dlenv "$W/links/qc" pro install 2>&1 < /dev/null)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'That was the key saved in ~/.quietclaude/license' && printf '%s' "$out" | grep -q 'qc pro install --key -'; then
+    ok "pro download 18: a refused saved key says it was the saved one and how to give another"
+else
+    bad "pro download 18: status $status: $out"
+fi
+
+rm -f "$W/home/.quietclaude/license"
+if command -v mkfifo >/dev/null 2>&1 && mkfifo "$W/home/.quietclaude/license" 2>/dev/null; then
+    out=$(python3 -c "
+import subprocess, sys
+try:
+    r = subprocess.run(sys.argv[1:], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10, start_new_session=True)
+    print(r.stdout.decode(), 'exit=%d' % r.returncode)
+except subprocess.TimeoutExpired:
+    print('TIMEOUT')
+" env HOME="$W/home" QUIETCLAUDE_PRO_BASE="http://127.0.0.1:$DLPORT" "$W/links/qc" pro install)
+    if printf '%s' "$out" | grep -q 'a licence key is needed' && ! printf '%s' "$out" | grep -q TIMEOUT; then
+        ok "pro download 19: a FIFO where the saved key should be does not hang qc"
+    else
+        bad "pro download 19: $out"
+    fi
+    rm -f "$W/home/.quietclaude/license"
+fi
+
+printf 'VALID-LINKED-KEY\n' > "$W/linked-key"
+ln -s "$W/linked-key" "$W/home/.quietclaude/license"
+out=$(python3 "$HERE/pty_uninstall.py" none env HOME="$W/home" QUIETCLAUDE_PRO_BASE="http://127.0.0.1:$DLPORT" "$W/links/qc" pro install 2>&1)
+if printf '%s' "$out" | grep -q 'a licence key is needed' && ! printf '%s' "$out" | grep -q 'pro stub'; then
+    ok "pro download 20: a symlink in place of the saved key file is not followed"
+else
+    bad "pro download 20: $out"
+fi
+rm -rf "$W/home/.quietclaude" "$W/linked-key"
+
+out=$(printf 'VALID-KEY-1234\n' | STUB_EXIT=3 dlenv sh -c 'trap "" CHLD; exec "$0" "$@"' "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 3 ]; then
+    ok "pro download 21: with SIGCHLD inherited as ignored, a failing installer is still reported as failing"
+else
+    bad "pro download 21: status $status: $out"
+fi
+
+mkdir -p "$W/ho\"me"
+: > "$DL/log"
+out=$(printf 'VALID-KEY-1234\n' | env HOME="$W/ho\"me" QUIETCLAUDE_PRO_BASE="http://127.0.0.1:$DLPORT" "$W/links/qc" pro install --key - 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'character that is not allowed' && [ ! -s "$DL/log" ] && [ -z "$(find "$W/ho\"me" -mindepth 1 2>/dev/null)" ]; then
+    ok "pro download 22: a quote or newline in the address or folder cannot add curl options, and nothing is left behind"
+else
+    bad "pro download 22: status $status: $out"
+fi
+rm -rf "$W/ho\"me"
 
 cat > "$W/standalone.c" <<'SOURCE'
 #include "core.h"

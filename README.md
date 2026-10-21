@@ -192,12 +192,25 @@ the built binary in a pseudoterminal and checks that the banner is gone and the 
 
 ## Pro
 
-The free launcher stays free and open source. QuietClaude Pro is a separate paid binary that adds
+The free launcher stays free and open source. QuietClaude Pro is a separate paid program that adds
 profiles for several Claude Code accounts, a header line you choose instead of the banner, config
-sync between your machines, and `qc pro update`. Once it is installed, `qc` hands the Pro commands
-and every normal launch over to it, so your default profile and header apply. If Pro cannot start,
-`qc` says so and starts Claude Code anyway. `qc --version` and `qc update` stay with the free
-launcher. Pro is not on sale yet; this section gets the link when it is.
+sync between your machines, and updates with `qc update`. Buy it at
+[quietclaude.com/pro](https://quietclaude.com/pro).
+
+To install it, run this and type the licence key from your Gumroad receipt when asked:
+
+```sh
+qc pro install
+```
+
+It works out your system, checks the key, downloads the right Pro build, verifies it and installs
+it in `~/.quietclaude`. The key does not show as you type. To skip the question, use
+`qc pro install --key - < keyfile`. If you already have the downloaded file, `qc pro install <file>`
+installs from it. A key saved by an earlier install is used without asking.
+
+Once Pro is installed, `qc` hands the Pro commands and every normal launch over to it, so your
+default profile and header apply. If Pro cannot start, `qc` says so and starts Claude Code anyway.
+`qc --version` stays with the free launcher.
 
 ## Licence
 

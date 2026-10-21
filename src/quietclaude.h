@@ -20,6 +20,7 @@ int qc_is_executable_file(const char *path);
 char *qc_find_claude(const char *self, int *status);
 int qc_exec_claude(const char *claude, char *const argv[]);
 int qc_uninstall(int argc, char **argv);
+int qc_pro_download_install(int argc, char **argv);
 
 typedef struct {
     int (*write)(void *io, const uint8_t *data, size_t len);
