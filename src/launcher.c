@@ -91,10 +91,10 @@ static int is_first_install(char **argv)
            && argv[3] != NULL && argv[3][0] != '-';
 }
 
-static int run_pro(char **argv)
+static char *find_pro(void)
 {
-    char *pro = NULL;
     const char *forced = getenv("QUIETCLAUDE_PRO_PATH");
+    char *pro = NULL;
     if (forced != NULL && forced[0] != '\0') {
         pro = qc_xstrdup(forced);
     } else {
@@ -103,7 +103,17 @@ static int run_pro(char **argv)
             pro = qc_join_path(home, ".quietclaude/pro");
         }
     }
-    if (pro == NULL || !qc_is_executable_file(pro)) {
+    if (pro != NULL && !qc_is_executable_file(pro)) {
+        free(pro);
+        pro = NULL;
+    }
+    return pro;
+}
+
+static int run_pro(char **argv)
+{
+    char *pro = find_pro();
+    if (pro == NULL) {
         if (is_first_install(argv)) {
             return run_downloaded_pro(argv);
         }
@@ -115,6 +125,20 @@ static int run_pro(char **argv)
         return 1;
     }
     return qc_exec_claude(pro, argv);
+}
+
+/* A plain launch goes to Pro when it is installed, so the profile and header settings apply.
+ * If Pro cannot be started, say so and carry on as the free launcher. */
+static void hand_plain_launch_to_pro(char **argv)
+{
+    char *pro = find_pro();
+    if (pro == NULL || setenv("QUIETCLAUDE_CORE_VERSION", QUIETCLAUDE_VERSION, 1) != 0) {
+        free(pro);
+        return;
+    }
+    execv(pro, argv);
+    qc_report_error("exec pro");
+    free(pro);
 }
 
 int main(int argc, char **argv)
@@ -135,6 +159,7 @@ int main(int argc, char **argv)
         return print_version(argv0, argv[1]);
     }
 
+    hand_plain_launch_to_pro(argv);
     qc_launch_options options = { NULL, NULL, NULL, NULL, 0, NULL };
     return qc_launch(&options, argc, argv);
 }
