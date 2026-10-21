@@ -103,7 +103,7 @@ Pro licence, profiles and sync files. `qc uninstall --dry-run` shows what it wou
 `qc uninstall --purge` also deletes `~/.quietclaude`, after you type `yes`; add `--yes` to skip the
 question when there is no terminal. It never asks for `sudo` on its own: when the folder is not
 yours to write to, it prints `sudo qc uninstall` and stops. It only works under the name `qc`, so
-`claude uninstall` still goes to Claude Code. Versions before 0.3.0 do not have this command; use
+`claude uninstall` still goes to Claude Code. Versions before 0.3.1 do not have this command; use
 the script above.
 
 ## Updating
