@@ -729,6 +729,89 @@ if command -v bash >/dev/null 2>&1; then
     fi
 fi
 
+# qc update goes to Pro. $W/pro is the stub that prints its arguments.
+out=$(QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" update --check 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q '^pro stub: pro update --check$' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.2'; then
+    ok "qc update 1: with Pro installed, qc update --check runs pro update --check"
+else
+    bad "qc update 1: status $status: $out"
+fi
+
+out=$(QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" update 2>&1)
+if printf '%s' "$out" | grep -q '^pro stub: pro update$'; then
+    ok "qc update 2: qc update alone runs pro update"
+else
+    bad "qc update 2: $out"
+fi
+
+printf 'not executable\n' > "$W/notpro"
+chmod 644 "$W/notpro"
+out=$(QUIETCLAUDE_PRO_PATH="$W/notpro" "$W/links/qc" update 2>&1)
+status=$?
+if [ "$status" -eq 2 ] && [ "$out" = "$nudge_update" ]; then
+    ok "qc update 3: a Pro that is not executable counts as not installed: the nudge"
+else
+    bad "qc update 3: status $status: $out"
+fi
+
+out=$(QUIETCLAUDE_PRO_PATH="$W/pro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/claude" update 2>&1)
+if ! printf '%s' "$out" | grep -q 'pro stub: pro update'; then
+    ok "qc update 4: claude update is never turned into pro update"
+else
+    bad "qc update 4: $out"
+fi
+
+if unshare -r true 2>/dev/null; then
+    out=$(unshare -r env -i PATH="$W/bin" HOME="$W/home" SUDO_USER=someone QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" update 2>&1)
+    status=$?
+    out2=$(unshare -r env -i PATH="$W/bin" HOME="$W/home" QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" update 2>&1)
+    if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'run qc update without sudo' && ! printf '%s' "$out" | grep -q 'pro stub' \
+        && printf '%s' "$out2" | grep -q '^pro stub: pro update$'; then
+        ok "qc update 5: as root through sudo it refuses, as plain root it runs"
+    else
+        bad "qc update 5: $status $out / $out2"
+    fi
+fi
+
+# qc uninstall under sudo: a private /etc/passwd in a user namespace stands in for a real sudo.
+if unshare -rm true 2>/dev/null; then
+    S28=$W/s28
+    scratch_install "$S28"
+    mkdir -p "$W/bobhome/.quietclaude/profiles/work" "$W/bobbyhome/.quietclaude"
+    printf 'login\n' > "$W/bobhome/.quietclaude/profiles/work/.credentials.json"
+    printf '#!/bin/sh\n' > "$W/bobhome/.quietclaude/pro"
+    printf '#!/bin/sh\n' > "$W/bobbyhome/.quietclaude/pro"
+    printf 'root:x:0:0:root:/root:/bin/sh\nbobby:x:1235:1235:%s/decoygecos:%s/bobbyhome:/bin/sh\nbob:x:1234:1234:Bob,,,:%s/bobhome:/bin/sh\n' "$W" "$W" "$W" > "$W/passwd"
+    out=$(unshare -rm sh -c "mount --bind '$W/passwd' /etc/passwd && env -i PATH='$W/bin' HOME=/nonexistent SUDO_USER=bob '$S28/qc' uninstall" 2>&1)
+    status=$?
+    if [ "$status" -eq 0 ] && [ ! -e "$S28/claude" ] && [ ! -e "$W/bobhome/.quietclaude/pro" ] && [ -f "$W/bobhome/.quietclaude/profiles/work/.credentials.json" ] \
+        && [ -f "$W/bobbyhome/.quietclaude/pro" ] && printf '%s' "$out" | grep -q "^Removed $W/bobhome/.quietclaude/pro\$"; then
+        ok "qc uninstall 28: under sudo it removes the Pro binary of SUDO_USER, not of a user whose name starts the same"
+    else
+        bad "qc uninstall 28: status $status: $out"
+    fi
+
+    scratch_install "$S28"
+    out=$(unshare -rm sh -c "mount --bind '$W/passwd' /etc/passwd && env -i PATH='$W/bin' HOME=/nonexistent SUDO_USER=bob '$S28/qc' uninstall --purge --yes" 2>&1)
+    status=$?
+    if [ "$status" -eq 0 ] && [ ! -e "$W/bobhome/.quietclaude" ] && [ -f "$W/bobbyhome/.quietclaude/pro" ] && [ ! -e "$S28/claude" ]; then
+        ok "qc uninstall 29: under sudo --purge deletes only the folder of SUDO_USER"
+    else
+        bad "qc uninstall 29: status $status: $out"
+    fi
+
+    scratch_install "$S28"
+    out=$(unshare -rm sh -c "mount --bind '$W/passwd' /etc/passwd && env -i PATH='$W/bin' HOME='$W/bobbyhome' SUDO_USER=nosuchuser '$S28/qc' uninstall --purge --yes" 2>&1)
+    status=$?
+    if [ "$status" -eq 0 ] && [ -f "$W/bobbyhome/.quietclaude/pro" ] && printf '%s' "$out" | grep -q 'home folder could not be found'; then
+        ok "qc uninstall 30: under sudo with an unknown user it skips Pro files rather than using root's HOME"
+    else
+        bad "qc uninstall 30: status $status: $out"
+    fi
+    rm -rf "$W/bobhome" "$W/bobbyhome" "$W/passwd"
+fi
+
 cat > "$W/standalone.c" <<'SOURCE'
 #include "core.h"
 int main(void) { return qc_core_version() == 0; }
