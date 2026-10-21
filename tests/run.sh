@@ -877,8 +877,8 @@ fi
 
 out=$(printf 'LIMIT-KEY-1234\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
 status=$?
-if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'too many downloads today' && [ "$(dl_left)" = "0" ]; then
-    ok "pro download 4: the daily limit is reported and cleaned up"
+if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'too many downloads today' && printf '%s' "$out" | grep -qE 'The limit resets at 00:00 UTC, in (about [0-9]+ hours?|less than an hour)\. Nothing installed' && [ "$(dl_left)" = "0" ]; then
+    ok "pro download 4: the daily limit is reported with when it resets, and cleaned up"
 else
     bad "pro download 4: status $status: $out"
 fi
