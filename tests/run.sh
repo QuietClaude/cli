@@ -517,8 +517,10 @@ Q10=$W/q10
 scratch_install "$Q10"
 out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q10/qc" uninstall 2>&1)
 status=$?
-if [ "$status" -eq 0 ] && [ ! -e "$Q10/claude" ] && [ ! -L "$Q10/qc" ] && printf '%s' "$out" | grep -q "^Removed $Q10/claude\$" \
-    && printf '%s' "$out" | grep -q "^Removed $Q10/qc\$" && printf '%s' "$out" | grep -q 'goes back to Claude Code'; then
+# The command prints real paths; on macOS the temp folder is a link (/var to /private/var).
+QP10=$(cd "$Q10" && pwd -P)
+if [ "$status" -eq 0 ] && [ ! -e "$Q10/claude" ] && [ ! -L "$Q10/qc" ] && printf '%s' "$out" | grep -q "^Removed $QP10/claude\$" \
+    && printf '%s' "$out" | grep -q "^Removed $QP10/qc\$" && printf '%s' "$out" | grep -q 'goes back to Claude Code'; then
     ok "qc uninstall 10: removes the launcher and the qc link"
 else
     bad "qc uninstall 10: status $status: $out"
@@ -573,8 +575,9 @@ printf '#!/bin/sh\n' > "$W/home/.quietclaude/pro"
 chmod 755 "$W/home/.quietclaude/pro"
 out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q14/qc" uninstall --dry-run 2>&1)
 status=$?
+QP14=$(cd "$Q14" && pwd -P)
 if [ "$status" -eq 0 ] && [ -x "$Q14/claude" ] && [ -L "$Q14/qc" ] && [ -f "$W/home/.quietclaude/pro" ] \
-    && printf '%s' "$out" | grep -q "^Would remove $Q14/claude\$" && printf '%s' "$out" | grep -q "^Would remove $W/home/.quietclaude/pro\$" \
+    && printf '%s' "$out" | grep -q "^Would remove $QP14/claude\$" && printf '%s' "$out" | grep -q "^Would remove $W/home/.quietclaude/pro\$" \
     && printf '%s' "$out" | grep -q 'Dry run: nothing was changed'; then
     ok "qc uninstall 14: --dry-run lists the removals and changes nothing"
 else
