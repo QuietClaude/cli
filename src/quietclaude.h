@@ -7,7 +7,7 @@
 #include "banner.h"
 #include "core.h"
 
-#define QUIETCLAUDE_VERSION "0.4.1"
+#define QUIETCLAUDE_VERSION "0.4.2"
 #define QUIETCLAUDE_PRO_URL "https://github.com/QuietClaude/cli#pro"
 #define QUIETCLAUDE_INSTALL_LINE "curl -fsSL https://quietclaude.com/install.sh | sh"
 
