@@ -289,7 +289,7 @@ fi
 
 out=$(QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" pro --x 2>&1)
 status=$?
-if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro --x' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.0'; then
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro --x' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.1'; then
     ok "dispatch 14: qc pro --x runs the stub with argv and core version"
 else
     bad "dispatch 14: status $status: $out"
@@ -314,7 +314,7 @@ for args in "@work" "--profile work" "profile list" "header show" "sync status";
 done
 
 out=$(QUIETCLAUDE_PRO_PATH="$W/pro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" --model opus -p 'reply ok' 2>&1 | cat)
-if printf '%s' "$out" | grep -q 'pro stub: --model opus -p reply ok' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.0' \
+if printf '%s' "$out" | grep -q 'pro stub: --model opus -p reply ok' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.1' \
     && ! printf '%s' "$out" | grep -q 'stub claude'; then
     ok "dispatch 16: with Pro installed, a plain launch goes to Pro"
 else
@@ -342,7 +342,7 @@ else
 fi
 
 out=$(QUIETCLAUDE_PRO_PATH="$W/pro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" --version 2>&1 | cat)
-if printf '%s' "$out" | grep -q '^QuietClaude 0.4.0' && ! printf '%s' "$out" | grep -q 'pro stub'; then
+if printf '%s' "$out" | grep -q '^QuietClaude 0.4.1' && ! printf '%s' "$out" | grep -q 'pro stub'; then
     ok "dispatch 16d: --version stays with the free launcher"
 else
     bad "dispatch 16d: $out"
@@ -361,7 +361,7 @@ chmod 644 "$W/download"
 out=$(cd "$W" && env -u QUIETCLAUDE_PRO_PATH HOME="$W/home" "$W/links/qc" pro install download --key - 2>&1)
 status=$?
 if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'pro stub: pro install download --key -' \
-    && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.0' && [ -x "$W/download" ]; then
+    && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.1' && [ -x "$W/download" ]; then
     ok "dispatch 18: qc pro install <file> without Pro runs the downloaded file"
 else
     bad "dispatch 18: status $status: $out"
@@ -738,7 +738,7 @@ fi
 # qc update goes to Pro. $W/pro is the stub that prints its arguments.
 out=$(QUIETCLAUDE_PRO_PATH="$W/pro" "$W/links/qc" update --check 2>&1)
 status=$?
-if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q '^pro stub: pro update --check$' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.0'; then
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q '^pro stub: pro update --check$' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.4.1'; then
     ok "qc update 1: with Pro installed, qc update --check runs pro update --check"
 else
     bad "qc update 1: status $status: $out"
