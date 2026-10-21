@@ -23,8 +23,8 @@ $(LIB): $(LIB_OBJ)
 src/%.o: src/%.c $(HDR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-qc: src/launcher.c src/uninstall.c $(LIB) $(HDR)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ src/launcher.c src/uninstall.c $(LIB) $(LDLIBS)
+qc: src/launcher.c src/uninstall.c src/pro_install.c $(LIB) $(HDR)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ src/launcher.c src/uninstall.c src/pro_install.c $(LIB) $(LDLIBS)
 
 tests/replay: tests/replay.c $(LIB) $(HDR)
 	$(CC) $(CFLAGS) -o $@ tests/replay.c $(LIB) $(LDLIBS)

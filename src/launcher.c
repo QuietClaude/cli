@@ -85,6 +85,20 @@ static int run_downloaded_pro(char **argv)
     return qc_exec_claude(file, argv);
 }
 
+/* qc pro install with no file: download Pro for this machine with a licence key, then install it. */
+static int is_download_install(char **argv)
+{
+    if (strcmp(argv[1], "pro") != 0 || argv[2] == NULL || strcmp(argv[2], "install") != 0) {
+        return 0;
+    }
+    for (int i = 3; argv[i] != NULL; i++) {
+        if (argv[i][0] != '-' && !(i > 3 && strcmp(argv[i - 1], "--key") == 0)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int is_first_install(char **argv)
 {
     return strcmp(argv[1], "pro") == 0 && argv[2] != NULL && strcmp(argv[2], "install") == 0
@@ -110,12 +124,15 @@ static char *find_pro(void)
     return pro;
 }
 
-static int run_pro(char **argv)
+static int run_pro(int argc, char **argv)
 {
     char *pro = find_pro();
     if (pro == NULL) {
         if (is_first_install(argv)) {
             return run_downloaded_pro(argv);
+        }
+        if (is_download_install(argv)) {
+            return qc_pro_download_install(argc, argv);
         }
         print_pro_nudge(argv[1]);
         return 2;
@@ -184,7 +201,7 @@ int main(int argc, char **argv)
             return qc_uninstall(argc, argv);
         }
         if (is_pro_word(argv[1])) {
-            return run_pro(argv);
+            return run_pro(argc, argv);
         }
     }
 

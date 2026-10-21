@@ -1,6 +1,6 @@
 """Run a command with or without a controlling terminal and answer its question.
 
-usage: pty_uninstall.py <answer|none> <command> [args...]
+usage: [PTY_PROMPT=text] pty_uninstall.py <answer|none> <command> [args...]
   answer   text typed at the terminal (for example yes or no)
   none     run in a new session with no terminal at all, so /dev/tty cannot be opened
 Prints the command's output, then a last line: exit=<status>
@@ -10,6 +10,7 @@ import pty
 import subprocess
 import sys
 
+PROMPT = os.environ.get("PTY_PROMPT", "Type yes to continue").encode()
 answer = sys.argv[1]
 command = sys.argv[2:]
 
@@ -33,7 +34,7 @@ while True:
     if not chunk:
         break
     output += chunk
-    if not sent and b"Type yes to continue" in output:
+    if not sent and PROMPT in output:
         os.write(fd, (answer + "\n").encode())
         sent = True
 _, status = os.waitpid(pid, 0)
