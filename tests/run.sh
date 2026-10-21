@@ -852,7 +852,7 @@ out=$(printf 'VALID-KEY-1234\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
 status=$?
 if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q "^Downloading QuietClaude Pro for this machine ($DLASSET)" \
     && printf '%s' "$out" | grep -qE "^pro stub args: pro install $W/home/\.quietclaude/\.qcpro\.[A-Za-z0-9]+/$DLASSET --key -$" \
-    && printf '%s' "$out" | grep -q '^pro stub key: VALID-KEY-1234$' && [ "$(dl_left)" = "0" ]; then
+    && printf '%s' "$out" | grep -q '^pro stub key: VALID-KEY-1234$' && [ "$(printf '%s\n' "$out" | grep -c '^Licence key accepted\.$')" = "1" ] && [ "$(dl_left)" = "0" ]; then
     ok "pro download 1: the key from stdin, three files fetched, the installer run on them with the key, temporary folder removed"
 else
     bad "pro download 1: status $status: $out (left: $(dl_left))"
@@ -868,6 +868,7 @@ fi
 out=$(printf 'BAD-KEY-12345\n' | dlenv "$W/links/qc" pro install --key - 2>&1)
 status=$?
 if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q 'this licence key is not valid; nothing installed' && ! printf '%s' "$out" | grep -q 'pro stub' \
+    && ! printf '%s' "$out" | grep -qi 'accepted' \
     && [ "$(wc -l < "$DL/log" | tr -d ' ')" = "1" ] && [ "$(dl_left)" = "0" ]; then
     ok "pro download 3: an invalid key stops at the first free file, before the program is downloaded, and nothing is left behind"
 else
@@ -907,8 +908,9 @@ mkdir -p "$W/home/.quietclaude"
 printf 'VALID-SAVED-KEY\n' > "$W/home/.quietclaude/license"
 out=$(dlenv "$W/links/qc" pro install 2>&1 < /dev/null)
 status=$?
-if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q 'Using the licence key saved in ~/.quietclaude/license' && printf '%s' "$out" | grep -q 'pro stub key: VALID-SAVED-KEY'; then
-    ok "pro download 8: a key kept by an earlier install is reused without asking"
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -qF "Using the saved licence key VALI$(printf '\342\200\246')-KEY (from ~/.quietclaude/license)" && printf '%s' "$out" | grep -q 'pro stub key: VALID-SAVED-KEY' \
+    && ! printf '%s' "$out" | grep -v 'pro stub key' | grep -q 'VALID-SAVED-KEY' && printf '%s' "$out" | grep -q '^Licence key accepted\.$'; then
+    ok "pro download 8: a key kept by an earlier install is reused without asking, shown with its middle hidden, and reported as accepted"
 else
     bad "pro download 8: status $status: $out"
 fi

@@ -372,7 +372,7 @@ int qc_pro_download_install(int argc, char **argv)
         from_argv = 1;
     } else if (saved_key(key, sizeof key) == 0) {
         g_used_saved = 1;
-        printf("Using the licence key saved in ~/.quietclaude/license.\n");
+        printf("Using the saved licence key %.4s\u2026%s (from ~/.quietclaude/license).\n", key, key + strlen(key) - 4);
     } else if (prompt_key(key, sizeof key) != 0) {
         fprintf(stderr, "quietclaude: a licence key is needed. Type it when asked, or run: qc pro install --key - < keyfile\n");
         return QC_EXIT_USAGE;
@@ -447,6 +447,11 @@ int qc_pro_download_install(int argc, char **argv)
         if (status != 200) {
             result = report_status(status, names[i]);
             goto done;
+        }
+        if (i == 0) {
+            /* The server asks Gumroad about the key before it sends the first file. */
+            printf("Licence key accepted.\n");
+            fflush(stdout);
         }
     }
     if (chmod(g_paths[2], 0700) != 0) {
