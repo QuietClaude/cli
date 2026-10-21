@@ -92,6 +92,20 @@ QuietClaude Pro keeps its licence, profiles and sync files in `~/.quietclaude`. 
 that folder alone and tells you how to delete it. Pro profiles hold separate Claude logins, so
 check before you remove it. From a clone, `make uninstall` runs the same script.
 
+Once `qc` is installed you can also ask it to remove itself:
+
+```sh
+qc uninstall
+```
+
+It removes the launcher, the `qc` link and the Pro program (`~/.quietclaude/pro`), and it keeps your
+Pro licence, profiles and sync files. `qc uninstall --dry-run` shows what it would remove first.
+`qc uninstall --purge` also deletes `~/.quietclaude`, after you type `yes`; add `--yes` to skip the
+question when there is no terminal. It never asks for `sudo` on its own: when the folder is not
+yours to write to, it prints `sudo qc uninstall` and stops. It only works under the name `qc`, so
+`claude uninstall` still goes to Claude Code. Versions before 0.3.0 do not have this command; use
+the script above.
+
 ## Updating
 
 The free launcher does not update itself. Run the install line again and you have the newest

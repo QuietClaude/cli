@@ -495,6 +495,240 @@ else
     bad "uninstall 9: status $status: $out"
 fi
 
+# qc uninstall: every case installs a scratch copy first, because the command deletes the launcher.
+scratch_install() {
+    mkdir -p "$1"
+    env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$1" sh "$ROOT/install.sh" >/dev/null 2>&1
+}
+run_qc() {
+    d=$1
+    shift
+    env -i PATH="$W/bin" HOME="$W/home" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$@" "$d/qc" uninstall
+}
+sha_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+Q10=$W/q10
+scratch_install "$Q10"
+out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q10/qc" uninstall 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$Q10/claude" ] && [ ! -L "$Q10/qc" ] && printf '%s' "$out" | grep -q "^Removed $Q10/claude\$" \
+    && printf '%s' "$out" | grep -q "^Removed $Q10/qc\$" && printf '%s' "$out" | grep -q 'goes back to Claude Code'; then
+    ok "qc uninstall 10: removes the launcher and the qc link"
+else
+    bad "qc uninstall 10: status $status: $out"
+fi
+
+Q11=$W/q11
+scratch_install "$Q11"
+out=$(env -i PATH="$W/bin" HOME="$W/home" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$Q11/claude" uninstall 2>&1)
+status=$?
+if [ "$status" -eq 7 ] && printf '%s' "$out" | grep -q 'stub claude: uninstall' && [ -x "$Q11/claude" ] && [ -L "$Q11/qc" ]; then
+    ok "qc uninstall 11: claude uninstall goes to Claude Code and removes nothing"
+else
+    bad "qc uninstall 11: status $status: $out"
+fi
+
+Q12=$W/q12
+scratch_install "$Q12"
+chmod 555 "$Q12"
+if [ "$(id -u)" -ne 0 ]; then
+    out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q12/qc" uninstall 2>&1)
+    status=$?
+    chmod 755 "$Q12"
+    if [ "$status" -eq 1 ] && printf '%s' "$out" | grep -q "is not writable. Run: sudo qc uninstall" && [ -x "$Q12/claude" ] && [ -L "$Q12/qc" ]; then
+        ok "qc uninstall 12: a folder you cannot write to gives the sudo line and removes nothing"
+    else
+        bad "qc uninstall 12: status $status: $out"
+    fi
+else
+    chmod 755 "$Q12"
+fi
+
+Q13=$W/q13
+scratch_install "$Q13"
+mkdir -p "$W/home/.quietclaude/profiles/work"
+printf 'keep\n' > "$W/home/.quietclaude/profiles/work/.credentials.json"
+printf 'licence\n' > "$W/home/.quietclaude/license"
+printf '#!/bin/sh\n' > "$W/home/.quietclaude/pro"
+chmod 755 "$W/home/.quietclaude/pro"
+out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q13/qc" uninstall 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$W/home/.quietclaude/pro" ] && [ -f "$W/home/.quietclaude/profiles/work/.credentials.json" ] \
+    && [ -f "$W/home/.quietclaude/license" ] && [ ! -e "$Q13/claude" ] && printf '%s' "$out" | grep -q "^Removed $W/home/.quietclaude/pro\$" \
+    && printf '%s' "$out" | grep -q "Left alone: $W/home/.quietclaude"; then
+    ok "qc uninstall 13: the Pro binary goes, the profiles, licence and config stay"
+else
+    bad "qc uninstall 13: status $status: $out"
+fi
+
+Q14=$W/q14
+scratch_install "$Q14"
+printf '#!/bin/sh\n' > "$W/home/.quietclaude/pro"
+chmod 755 "$W/home/.quietclaude/pro"
+out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q14/qc" uninstall --dry-run 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ -x "$Q14/claude" ] && [ -L "$Q14/qc" ] && [ -f "$W/home/.quietclaude/pro" ] \
+    && printf '%s' "$out" | grep -q "^Would remove $Q14/claude\$" && printf '%s' "$out" | grep -q "^Would remove $W/home/.quietclaude/pro\$" \
+    && printf '%s' "$out" | grep -q 'Dry run: nothing was changed'; then
+    ok "qc uninstall 14: --dry-run lists the removals and changes nothing"
+else
+    bad "qc uninstall 14: status $status: $out"
+fi
+rm -f "$W/home/.quietclaude/pro"
+
+Q15=$W/q15
+scratch_install "$Q15"
+out=$(python3 "$HERE/pty_uninstall.py" no env -i PATH="$W/bin" HOME="$W/home" "$Q15/qc" uninstall --purge 2>&1)
+if printf '%s' "$out" | grep -q 'exit=1' && [ -x "$Q15/claude" ] && [ -f "$W/home/.quietclaude/license" ] \
+    && printf '%s' "$out" | grep -q 'nothing was deleted'; then
+    ok "qc uninstall 15: --purge answered no deletes nothing"
+else
+    bad "qc uninstall 15: $out"
+fi
+
+out=$(python3 "$HERE/pty_uninstall.py" none env -i PATH="$W/bin" HOME="$W/home" "$Q15/qc" uninstall --purge 2>&1)
+if printf '%s' "$out" | grep -q 'exit=1' && [ -x "$Q15/claude" ] && [ -f "$W/home/.quietclaude/license" ] \
+    && printf '%s' "$out" | grep -q 'needs a terminal'; then
+    ok "qc uninstall 17: --purge with no terminal is refused"
+else
+    bad "qc uninstall 17: $out"
+fi
+
+out=$(python3 "$HERE/pty_uninstall.py" yes env -i PATH="$W/bin" HOME="$W/home" "$Q15/qc" uninstall --purge 2>&1)
+if printf '%s' "$out" | grep -q 'exit=0' && [ ! -e "$Q15/claude" ] && [ ! -e "$W/home/.quietclaude" ] \
+    && printf '%s' "$out" | grep -q "Deleted the folder $W/home/.quietclaude"; then
+    ok "qc uninstall 16: --purge answered yes deletes the Pro folder and the launcher"
+else
+    bad "qc uninstall 16: $out"
+fi
+
+Q18=$W/q18
+scratch_install "$Q18"
+mkdir -p "$W/home/.quietclaude/profiles/work"
+printf 'x\n' > "$W/home/.quietclaude/profiles/work/.credentials.json"
+out=$(python3 "$HERE/pty_uninstall.py" none env -i PATH="$W/bin" HOME="$W/home" "$Q18/qc" uninstall --purge --yes 2>&1)
+if printf '%s' "$out" | grep -q 'exit=0' && [ ! -e "$Q18/claude" ] && [ ! -e "$W/home/.quietclaude" ]; then
+    ok "qc uninstall 18: --purge --yes needs no terminal"
+else
+    bad "qc uninstall 18: $out"
+fi
+
+Q20=$W/q20
+mkdir -p "$Q20/other"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$Q20" ALIAS= sh "$ROOT/install.sh" >/dev/null 2>&1
+fake_claude_code "$Q20/other/claude"
+ln -s "$Q20/other/claude" "$Q20/qc"
+mkdir -p "$Q20/bin"
+ln -s "$Q20/claude" "$Q20/bin/qc"
+out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q20/bin/qc" uninstall 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$Q20/claude" ] && [ ! -L "$Q20/bin/qc" ] && [ -L "$Q20/qc" ] && [ "$(readlink "$Q20/qc")" = "$Q20/other/claude" ]; then
+    ok "qc uninstall 20: the link it was run through goes, a qc link to something else stays"
+else
+    bad "qc uninstall 20: status $status: $out"
+fi
+
+Q21=$W/q21
+scratch_install "$Q21"
+fake_claude_code "$Q21/claude-code-copy"
+before=$(sha_of "$Q21/claude-code-copy")
+env -i PATH="$W/bin" HOME="$W/home" "$Q21/qc" uninstall >/dev/null 2>&1
+after=$(sha_of "$Q21/claude-code-copy")
+if [ -n "$before" ] && [ "$before" = "$after" ] && [ ! -e "$Q21/claude" ]; then
+    ok "qc uninstall 21: another claude in the same folder is untouched"
+else
+    bad "qc uninstall 21: $before / $after"
+fi
+
+Q22=$W/q22
+scratch_install "$Q22"
+out1=$(env -i PATH="$W/bin" HOME="$W/home" "$Q22/qc" uninstall --bogus 2>&1)
+status1=$?
+out2=$(env -i PATH="$W/bin" HOME="$W/home" "$Q22/qc" uninstall --yes 2>&1)
+status2=$?
+if [ "$status1" -eq 2 ] && [ "$status2" -eq 2 ] && printf '%s' "$out1" | grep -q 'usage: qc uninstall' && [ -x "$Q22/claude" ]; then
+    ok "qc uninstall 22: unknown options and --yes without --purge are usage errors that remove nothing"
+else
+    bad "qc uninstall 22: $status1 $out1 / $status2 $out2"
+fi
+rm -rf "$W/home/.quietclaude"
+
+Q23=$W/q23
+scratch_install "$Q23"
+out=$(env -i PATH="$Q23:$W/bin" HOME="$W/home" qc uninstall 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$Q23/claude" ] && [ ! -L "$Q23/qc" ] && ! printf '%s' "$out" | grep -q 'cannot remove'; then
+    ok "qc uninstall 23: a bare qc found through PATH removes the launcher and the link once"
+else
+    bad "qc uninstall 23: status $status: $out"
+fi
+
+Q24=$W/q24
+scratch_install "$Q24"
+out=$(cd "$Q24" && env -i PATH=":$W/bin" HOME="$W/home" qc uninstall 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$Q24/claude" ] && [ ! -L "$Q24/qc" ] && ! printf '%s' "$out" | grep -q 'cannot remove'; then
+    ok "qc uninstall 24: an empty PATH entry (the current folder) works and the link is not removed twice"
+else
+    bad "qc uninstall 24: status $status: $out"
+fi
+
+Q25=$W/q25
+scratch_install "$Q25"
+mkdir -p "$W/realqc/profiles/work"
+printf 'login\n' > "$W/realqc/profiles/work/.credentials.json"
+rm -rf "$W/home/.quietclaude"
+ln -s "$W/realqc" "$W/home/.quietclaude"
+out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q25/qc" uninstall --purge --yes 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$Q25/claude" ] && [ -L "$W/home/.quietclaude" ] && [ -f "$W/realqc/profiles/work/.credentials.json" ] \
+    && printf '%s' "$out" | grep -q 'is a link, so --purge leaves it alone' && printf '%s' "$out" | grep -q "Left alone: $W/home/.quietclaude"; then
+    ok "qc uninstall 25: a ~/.quietclaude that is a link is never purged, and the message says so"
+else
+    bad "qc uninstall 25: status $status: $out"
+fi
+rm -rf "$W/home/.quietclaude" "$W/realqc"
+
+Q26=$W/q26
+mkdir -p "$Q26/bin"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$Q26" ALIAS= sh "$ROOT/install.sh" >/dev/null 2>&1
+ln -s "$Q26/claude" "$Q26/bin/qc"
+chmod 555 "$Q26/bin"
+if [ "$(id -u)" -ne 0 ]; then
+    out=$(env -i PATH="$W/bin" HOME="$W/home" "$Q26/bin/qc" uninstall 2>&1)
+    status=$?
+    chmod 755 "$Q26/bin"
+    if [ "$status" -eq 1 ] && [ -x "$Q26/claude" ] && [ -L "$Q26/bin/qc" ] && printf '%s' "$out" | grep -q "$Q26/bin is not writable"; then
+        ok "qc uninstall 26: a link in a folder you cannot write to stops everything before anything is removed"
+    else
+        bad "qc uninstall 26: status $status: $out"
+    fi
+else
+    chmod 755 "$Q26/bin"
+fi
+
+Q27=$W/q27
+scratch_install "$Q27"
+mkdir -p "$W/q27other"
+printf 'not the launcher\n' > "$W/q27other/qc"
+chmod 755 "$W/q27other/qc"
+if command -v bash >/dev/null 2>&1; then
+    out=$(env -i PATH="$W/bin:$(dirname "$(command -v bash)")" HOME="$W/home" bash -c "exec -a '$W/q27other/qc' '$Q27/claude' uninstall" 2>&1)
+    status=$?
+    if [ "$status" -eq 1 ] && [ -x "$Q27/claude" ] && [ -L "$Q27/qc" ] && [ "$(cat "$W/q27other/qc")" = "not the launcher" ] \
+        && printf '%s' "$out" | grep -q 'is not the program that was started'; then
+        ok "qc uninstall 27: a program name that points at some other file removes nothing"
+    else
+        bad "qc uninstall 27: status $status: $out"
+    fi
+fi
+
 cat > "$W/standalone.c" <<'SOURCE'
 #include "core.h"
 int main(void) { return qc_core_version() == 0; }
