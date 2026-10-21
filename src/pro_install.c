@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -322,9 +323,19 @@ static int report_status(int status, const char *what)
         break;
     case -2:
         break;
-    case 429:
-        fprintf(stderr, "quietclaude: too many downloads today for this key. Try again tomorrow; nothing installed.\n");
+    case 429: {
+        /* The server counts days in UTC, so the limit resets at the next 00:00 UTC. */
+        long left = 86400 - (long)(time(NULL) % 86400);
+        long hours = (left + 3599) / 3600;
+        char when[64];
+        if (left < 3600) {
+            snprintf(when, sizeof when, "in less than an hour");
+        } else {
+            snprintf(when, sizeof when, "in about %ld hour%s", hours, hours == 1 ? "" : "s");
+        }
+        fprintf(stderr, "quietclaude: too many downloads today for this key. The limit resets at 00:00 UTC, %s. Nothing installed.\n", when);
         break;
+    }
     case 503:
         fprintf(stderr, "quietclaude: the licence service is not available right now. Try again in a few minutes; nothing installed.\n");
         break;
