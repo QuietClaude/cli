@@ -127,6 +127,37 @@ static int run_pro(char **argv)
     return qc_exec_claude(pro, argv);
 }
 
+/* qc update belongs to Pro. With Pro installed it runs `pro update`, which checks the licence first;
+ * without Pro it prints the nudge. Run through sudo it would change root's files, so it refuses. */
+static int run_update(int argc, char **argv)
+{
+    char *pro = find_pro();
+    if (pro == NULL) {
+        print_update_nudge();
+        return 2;
+    }
+    const char *sudo_user = getenv("SUDO_USER");
+    if (geteuid() == 0 && sudo_user != NULL && sudo_user[0] != '\0') {
+        fprintf(stderr, "quietclaude: run qc update without sudo; Pro keeps its files in your home folder.\n");
+        free(pro);
+        return 1;
+    }
+    if (setenv("QUIETCLAUDE_CORE_VERSION", QUIETCLAUDE_VERSION, 1) != 0) {
+        qc_report_error("setenv");
+        free(pro);
+        return 1;
+    }
+    char **pro_argv = qc_xmalloc(sizeof(char *) * ((size_t)argc + 3));
+    pro_argv[0] = argv[0];
+    pro_argv[1] = "pro";
+    pro_argv[2] = "update";
+    for (int i = 2; i < argc; i++) {
+        pro_argv[i + 1] = argv[i];
+    }
+    pro_argv[argc + 1] = NULL;
+    return qc_exec_claude(pro, pro_argv);
+}
+
 /* A plain launch goes to Pro when it is installed, so the profile and header settings apply.
  * If Pro cannot be started, say so and carry on as the free launcher. */
 static void hand_plain_launch_to_pro(char **argv)
@@ -147,8 +178,7 @@ int main(int argc, char **argv)
 
     if (argc >= 2) {
         if (strcmp(base_name(argv0), "qc") == 0 && strcmp(argv[1], "update") == 0) {
-            print_update_nudge();
-            return 2;
+            return run_update(argc, argv);
         }
         if (strcmp(base_name(argv0), "qc") == 0 && strcmp(argv[1], "uninstall") == 0) {
             return qc_uninstall(argc, argv);

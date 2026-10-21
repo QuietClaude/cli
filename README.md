@@ -109,7 +109,13 @@ the script above.
 ## Updating
 
 The free launcher does not update itself. Run the install line again and you have the newest
-version. `qc update` tells you the same thing.
+version.
+
+`qc update` is part of QuietClaude Pro. With Pro installed it runs `qc pro update`, which checks
+your licence and then replaces the Pro program with the newest signed release. Without Pro it
+tells you how to get Pro and how to update the free launcher by hand. Do not run it with `sudo`:
+Pro keeps its files in your home folder, and `qc update` stops if you try. `claude update` is
+not touched; it still goes to Claude Code.
 
 ## Use
 
