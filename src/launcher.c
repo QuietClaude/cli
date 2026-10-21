@@ -150,6 +150,9 @@ int main(int argc, char **argv)
             print_update_nudge();
             return 2;
         }
+        if (strcmp(base_name(argv0), "qc") == 0 && strcmp(argv[1], "uninstall") == 0) {
+            return qc_uninstall(argc, argv);
+        }
         if (is_pro_word(argv[1])) {
             return run_pro(argv);
         }
