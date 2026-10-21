@@ -72,6 +72,8 @@ cleanup() {
 trap cleanup EXIT INT TERM HUP
 
 mkdir -p "$W/bin" "$W/fakebin" "$W/nocurl" "$W/tmp" "$W/home" "$W/links" "$W/local"
+export HOME="$W/home"
+unset QUIETCLAUDE_PRO_PATH
 for tool in sh uname mktemp rm dirname basename awk head install ln mkdir sha256sum shasum curl wget cat chmod grep sed; do
     path=$(command -v "$tool" 2>/dev/null) || continue
     ln -s "$path" "$W/bin/$tool"
@@ -309,12 +311,38 @@ for args in "@work" "--profile work" "profile list" "header show" "sync status";
 done
 
 out=$(QUIETCLAUDE_PRO_PATH="$W/pro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" --model opus -p 'reply ok' 2>&1 | cat)
-QUIETCLAUDE_PRO_PATH="$W/pro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" --model opus -p 'reply ok' >/dev/null 2>&1
+if printf '%s' "$out" | grep -q 'pro stub: --model opus -p reply ok' && printf '%s' "$out" | grep -q 'QUIETCLAUDE_CORE_VERSION=0.2.1' \
+    && ! printf '%s' "$out" | grep -q 'stub claude'; then
+    ok "dispatch 16: with Pro installed, a plain launch goes to Pro"
+else
+    bad "dispatch 16: $out"
+fi
+
+out=$(QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" --model opus -p 'reply ok' 2>&1 | cat)
+QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" --model opus -p 'reply ok' >/dev/null 2>&1
 status=$?
 if [ "$status" -eq 7 ] && printf '%s' "$out" | grep -q "stub claude: --model opus -p reply ok" && ! printf '%s' "$out" | grep -q 'pro stub'; then
-    ok "dispatch 16: ordinary arguments go to Claude Code, not the stub"
+    ok "dispatch 16b: without Pro, ordinary arguments go to Claude Code"
 else
-    bad "dispatch 16: status $status: $out"
+    bad "dispatch 16b: status $status: $out"
+fi
+
+printf '#!/nonexistent/interpreter\n' > "$W/brokenpro"
+chmod 755 "$W/brokenpro"
+out=$(QUIETCLAUDE_PRO_PATH="$W/brokenpro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" -p 'reply ok' 2>&1 | cat)
+QUIETCLAUDE_PRO_PATH="$W/brokenpro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" -p 'reply ok' >/dev/null 2>&1
+status=$?
+if [ "$status" -eq 7 ] && printf '%s' "$out" | grep -q 'exec pro' && printf '%s' "$out" | grep -q 'stub claude: -p reply ok'; then
+    ok "dispatch 16c: a Pro that cannot start is reported and Claude Code still launches"
+else
+    bad "dispatch 16c: status $status: $out"
+fi
+
+out=$(QUIETCLAUDE_PRO_PATH="$W/pro" QUIETCLAUDE_CLAUDE_PATH="$W/stubclaude" "$W/links/qc" --version 2>&1 | cat)
+if printf '%s' "$out" | grep -q '^QuietClaude 0.2.1' && ! printf '%s' "$out" | grep -q 'pro stub'; then
+    ok "dispatch 16d: --version stays with the free launcher"
+else
+    bad "dispatch 16d: $out"
 fi
 
 err=$(PATH=/usr/bin "$W/links/qc" update 2>&1 >/dev/null)

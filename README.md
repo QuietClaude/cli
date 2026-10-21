@@ -149,7 +149,9 @@ the built binary in a pseudoterminal and checks that the banner is gone and the 
 The free launcher stays free and open source. QuietClaude Pro is a separate paid binary that adds
 profiles for several Claude Code accounts, a header line you choose instead of the banner, config
 sync between your machines, and `qc pro update`. Once it is installed, `qc` hands the Pro commands
-over to it. Pro is not on sale yet; this section gets the link when it is.
+and every normal launch over to it, so your default profile and header apply. If Pro cannot start,
+`qc` says so and starts Claude Code anyway. `qc --version` and `qc update` stay with the free
+launcher. Pro is not on sale yet; this section gets the link when it is.
 
 ## Licence
 
