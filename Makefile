@@ -35,7 +35,10 @@ test: qc tests/replay
 install: qc
 	sh install.sh
 
+uninstall:
+	sh uninstall.sh
+
 clean:
 	rm -f qc tests/replay $(LIB) $(LIB_OBJ)
 
-.PHONY: all lib test install clean
+.PHONY: all lib test install uninstall clean

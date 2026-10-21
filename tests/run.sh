@@ -74,7 +74,7 @@ trap cleanup EXIT INT TERM HUP
 mkdir -p "$W/bin" "$W/fakebin" "$W/nocurl" "$W/tmp" "$W/home" "$W/links" "$W/local"
 export HOME="$W/home"
 unset QUIETCLAUDE_PRO_PATH
-for tool in sh uname mktemp rm dirname basename awk head install ln mkdir sha256sum shasum curl wget cat chmod grep sed; do
+for tool in sh uname mktemp rm dirname basename awk head install ln mkdir sha256sum shasum curl wget cat chmod grep sed readlink; do
     path=$(command -v "$tool" 2>/dev/null) || continue
     ln -s "$path" "$W/bin/$tool"
     [ "$tool" = curl ] || ln -s "$path" "$W/nocurl/$tool"
@@ -381,6 +381,118 @@ if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q "pro stub: pro install $W
     ok "dispatch 20: with Pro installed, qc pro install goes to Pro"
 else
     bad "dispatch 20: status $status: $out"
+fi
+
+uninstall_env() {
+    env -i PATH="${UPATH:-$W/bin}" HOME="$W/home" "$@" sh "$ROOT/uninstall.sh"
+}
+fake_claude_code() {
+    printf '#!/bin/sh\necho "2.1.304 (Claude Code)"\n' > "$1"
+    chmod 755 "$1"
+}
+
+U1=$W/u1
+mkdir -p "$U1"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$U1" sh "$ROOT/install.sh" >/dev/null 2>&1
+out=$(uninstall_env PREFIX="$U1" 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$U1/claude" ] && [ ! -L "$U1/qc" ] \
+    && printf '%s' "$out" | grep -q "^Removed $U1/claude\$" && printf '%s' "$out" | grep -q "^Removed $U1/qc\$" \
+    && printf '%s' "$out" | grep -q 'goes back to Claude Code'; then
+    ok "uninstall 1: removes the launcher and the qc link"
+else
+    bad "uninstall 1: status $status: $out"
+fi
+
+out=$(uninstall_env PREFIX="$U1" 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && printf '%s' "$out" | grep -q '^Nothing to remove'; then
+    ok "uninstall 2: running it again says there is nothing to remove"
+else
+    bad "uninstall 2: status $status: $out"
+fi
+
+U3=$W/u3
+mkdir -p "$U3"
+fake_claude_code "$U3/claude"
+ln -s "$U3/claude" "$U3/qc"
+out=$(uninstall_env PREFIX="$U3" 2>&1)
+status=$?
+if [ "$status" -eq 1 ] && [ -x "$U3/claude" ] && [ -L "$U3/qc" ] && printf '%s' "$out" | grep -q 'is not QuietClaude, so it was left alone'; then
+    ok "uninstall 3: a claude that is not QuietClaude is never removed, nor a link to it"
+else
+    bad "uninstall 3: status $status: $out"
+fi
+
+U4=$W/u4
+mkdir -p "$U4"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$U4" ALIAS= sh "$ROOT/install.sh" >/dev/null 2>&1
+fake_claude_code "$U4/other"
+ln -s "$U4/other" "$U4/qc"
+out=$(uninstall_env PREFIX="$U4" 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$U4/claude" ] && [ -L "$U4/qc" ] && [ "$(readlink "$U4/qc")" = "$U4/other" ] \
+    && printf '%s' "$out" | grep -q 'was left alone because it is not a QuietClaude link'; then
+    ok "uninstall 4: a qc link that points somewhere else is left alone"
+else
+    bad "uninstall 4: status $status: $out"
+fi
+
+U5=$W/u5
+mkdir -p "$U5"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$U5" sh "$ROOT/install.sh" >/dev/null 2>&1
+out=$(uninstall_env PREFIX="$U5" DRY_RUN=1 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ -x "$U5/claude" ] && [ -L "$U5/qc" ] && printf '%s' "$out" | grep -q "^Would remove $U5/claude\$" \
+    && printf '%s' "$out" | grep -q 'Dry run: nothing was changed'; then
+    ok "uninstall 5: DRY_RUN lists what would go and changes nothing"
+else
+    bad "uninstall 5: status $status: $out"
+fi
+
+mkdir -p "$W/home/.quietclaude/profiles/work"
+printf 'keep me\n' > "$W/home/.quietclaude/profiles/work/.credentials.json"
+out=$(uninstall_env PREFIX="$U5" 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$U5/claude" ] && [ -f "$W/home/.quietclaude/profiles/work/.credentials.json" ] \
+    && printf '%s' "$out" | grep -q "Left alone: $W/home/.quietclaude" && printf '%s' "$out" | grep -q 'rm -rf'; then
+    ok "uninstall 6: Pro data in ~/.quietclaude is left alone and the message says how to remove it"
+else
+    bad "uninstall 6: status $status: $out"
+fi
+rm -rf "$W/home/.quietclaude"
+
+U7=$W/u7
+mkdir -p "$U7/bin"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$U7/bin" sh "$ROOT/install.sh" >/dev/null 2>&1
+out=$(UPATH="$U7/bin:$W/bin" uninstall_env 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$U7/bin/claude" ] && [ ! -L "$U7/bin/qc" ]; then
+    ok "uninstall 7: without PREFIX it finds the install through qc in PATH"
+else
+    bad "uninstall 7: status $status: $out"
+fi
+
+U8=$W/u8
+mkdir -p "$U8"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$U8" ALIAS=cq sh "$ROOT/install.sh" >/dev/null 2>&1
+out=$(uninstall_env PREFIX="$U8" ALIAS=cq 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ ! -e "$U8/claude" ] && [ ! -L "$U8/cq" ]; then
+    ok "uninstall 8: a custom ALIAS is removed with the launcher"
+else
+    bad "uninstall 8: status $status: $out"
+fi
+
+U9=$W/u9
+mkdir -p "$U9/own" "$U9/other"
+env -i PATH="$W/bin" HOME="$W/home" SOURCE="$QC" PREFIX="$U9/other" sh "$ROOT/install.sh" >/dev/null 2>&1
+out=$(UPATH="$U9/other:$W/bin" uninstall_env PREFIX="$U9/own" 2>&1)
+status=$?
+if [ "$status" -eq 0 ] && [ -x "$U9/other/claude" ] && printf '%s' "$out" | grep -q '^Nothing to remove'; then
+    ok "uninstall 9: an explicit PREFIX is never replaced by whatever qc is in PATH"
+else
+    bad "uninstall 9: status $status: $out"
 fi
 
 cat > "$W/standalone.c" <<'SOURCE'

@@ -66,6 +66,32 @@ can change the location with `PREFIX`, `DEST`, `ALIAS` (set it empty to skip the
 PREFIX="$HOME/bin" make install
 ```
 
+## Uninstall
+
+One line, the same way you installed:
+
+```sh
+curl -fsSL https://quietclaude.com/uninstall.sh | sh
+```
+
+It removes the `claude` launcher and the `qc` link, and nothing else. Before it deletes a `claude`
+it checks that the file is QuietClaude, so Claude Code's own `claude` is never touched. Afterwards
+the name `claude` goes back to Claude Code. If you added an alias for it to your shell profile,
+remove that line yourself.
+
+If you installed into a folder of your own, name it again:
+
+```sh
+curl -fsSL https://quietclaude.com/uninstall.sh | PREFIX="$HOME/bin" sh
+```
+
+To see what it would remove without removing anything, add `DRY_RUN=1` the same way. It uses
+`sudo` only when the folder is not yours to write to.
+
+QuietClaude Pro keeps its licence, profiles and sync files in `~/.quietclaude`. The script leaves
+that folder alone and tells you how to delete it. Pro profiles hold separate Claude logins, so
+check before you remove it. From a clone, `make uninstall` runs the same script.
+
 ## Updating
 
 The free launcher does not update itself. Run the install line again and you have the newest
